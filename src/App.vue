@@ -1,14 +1,36 @@
-<template>
-  <div id="app">
-    <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
-    </div>
-    <router-view/>
-  </div>
+<template lang="pug">
+  #app
+    transition(name="fade" mode="out-in")
+      router-view
 </template>
 
+<script>
+import { mapState } from 'vuex'
+
+export default {
+  name: 'App',
+  computed: mapState([
+    'is_auth'
+  ]),
+  mounted () {
+    if (!this.turn_auth) {
+      this.$router.push('login')
+    }
+  }
+}
+</script>
+
 <style lang="less">
+* {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  vertical-align: baseline;
+  font-size: inherit;
+  color: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
