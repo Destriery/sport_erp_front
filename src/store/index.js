@@ -5,11 +5,15 @@ Vue.use(Vuex)
 
 export default new Vuex.Store({
   state: {
-    is_auth: false
+    isAuth: false,
+    isCollapseNav: false
   },
   mutations: {
-    turn_auth (state) {
-      state.is_auth = !state.is_auth
+    turnAuth (state) {
+      state.isAuth = !state.isAuth
+    },
+    turnCollapseNav (state) {
+      state.isCollapseNav = !state.isCollapseNav
     }
   },
   actions: {

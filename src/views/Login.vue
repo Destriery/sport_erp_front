@@ -32,7 +32,7 @@ export default {
       this.$refs[formName].validate((valid) => {
         if (valid) {
           this.$router.push('/')
-          this.$store.commit('turn_auth')
+          this.$store.commit('turnAuth')
         } else {
           return false
         }
@@ -59,6 +59,7 @@ export default {
   .el-card {
     width: 400px;
     margin-bottom: 200px;
+    text-align: center;
   }
 }
 </style>

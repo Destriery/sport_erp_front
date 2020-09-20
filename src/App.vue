@@ -1,19 +1,25 @@
 <template lang="pug">
   #app
+    Nav(v-if="isAuth")
     transition(name="fade" mode="out-in")
       router-view
 </template>
 
 <script>
 import { mapState } from 'vuex'
+import Nav from '@/components/Nav.vue'
 
 export default {
   name: 'App',
   computed: mapState([
-    'is_auth'
+    'isAuth',
+    'isCollapseNav'
   ]),
+  components: {
+    Nav
+  },
   mounted () {
-    if (!this.turn_auth) {
+    if (!this.isAuth) {
       this.$router.push('login')
     }
   }
@@ -35,20 +41,69 @@ export default {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
   color: #2c3e50;
 }
+.page {
+  padding-left: 270px;
+  padding-right: 20px;
+  transition: padding 0.3s ease;
 
-#nav {
-  padding: 30px;
+  &.page--wide {
+    padding-left: 84px;
+  }
 
-  a {
-    font-weight: bold;
-    color: #2c3e50;
+  h1 {
+    display: inline-block;
+    margin: 20px auto;
+    font-size: 24px;
+    font-weight: normal;
 
-    &.router-link-exact-active {
-      color: #42b983;
+    .el-button {
+      margin-left: 20px;
+      padding: 7px;
+      vertical-align: 3px;
     }
   }
+  h3 {
+    margin: 30px 0 0;
+  }
+  ul {
+    list-style-type: none;
+    padding: 0;
+  }
+  li {
+    display: inline-block;
+    margin: 0 10px;
+  }
+  a {
+    color: #42b983;
+  }
+
+  .green {
+    color: #67C23A;
+  }
+  .red {
+    color: red;
+  }
+
+  .el-breadcrumb {
+    margin-top: 20px;
+
+    .el-breadcrumb__inner {
+      &.is-link {
+        font-weight: normal;
+      }
+    }
+  }
+
+  .content {
+    p {
+      margin-bottom: 15px;
+    }
+  }
+}
+
+.el-popover-avatar {
+  padding: 0;
 }
 </style>
