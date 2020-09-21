@@ -5,56 +5,20 @@
         el-breadcrumb-item(:to="{ path: '/' }")
           i.el-icon-s-home
         el-breadcrumb-item &nbsp;
-      h1 Мероприятия
-        el-button(type="success" icon="el-icon-plus" circle @click="isOpenEventDialog = true")
+      h1 Площадки
+        //-- el-button(type="success" icon="el-icon-plus" circle @click="isOpenEventDialog = true")
 
-      EventDialog(:sync="isOpenEventDialog" @sync="isOpenEventDialog = $event" @save="event = $event" :data="event")
+      //-- EventDialog(:sync="isOpenEventDialog" @sync="isOpenEventDialog = $event" @save="event = $event" :data="event")
 
       .filters
         el-input(placeholder="Искать.." v-model="search" clearable)
           i.el-input__icon.el-icon-search(slot="suffix")
 
-        el-select(
-            v-model="filter.sport_types"
-            filterable
-            clearable
-            multiple
-            placeholder="Вид спорта"
-          )
-          el-option(v-for="item in sportTypes" :key="item.id" :label="item.title" :value="item.id")
-
-        el-select(
-            v-model="filter.event_place"
-            filterable
-            clearable
-            placeholder="Площадка"
-          )
-          el-option(v-for="item in eventPlaces" :key="item.id" :label="item.title" :value="item.id")
-
-        el-date-picker(
-            v-model="value2"
-            type="daterange"
-            align="right"
-            unlink-panels
-            range-separator=" - "
-            start-placeholder="От"
-            end-placeholder="До"
-            :picker-options="pickerOptions"
-          )
-
-      el-table(:data="getData()" @row-click="openEvent")
+      el-table(:data="getData()")
         el-table-column(label="Название" prop="title")
-        el-table-column(label="Дата" prop="started_at")
-          template(slot-scope="scope")
-            span(v-text="formatDateTime(scope.row.started_at)")
-        el-table-column(label="Площадка" prop="event_place.title")
-        el-table-column(label="Виды спорта" prop="sport_types")
-          template(slot-scope="scope")
-            span(v-html="getListFromObject(scope.row.sport_types, 'title')")
-
-        el-table-column(label="Активность" prop="is_active" align="center")
-          template(slot-scope="scope")
-            i.el-icon-success.green(v-if="scope.row.is_active")
+        el-table-column(label="E-mail" prop="email")
+        el-table-column(label="Адрес" prop="address")
+        el-table-column(label="Телефон" prop="phone")
 
   //-- заголовок, дата, активно/прошло, возможно какая-то статистика - типа прогресса по организации, количество участников и тд площадка, дата/время
 </template>
@@ -69,7 +33,7 @@ import { defaultRequest } from '@/requests'
 const requests = defaultRequest(JSON.parse(localStorage.getItem('serp__Token')).value)
 
 export default {
-  name: 'Events',
+  name: 'EventPlaces',
   computed: mapState([
     'isAuth',
     'isCollapseNav',
@@ -101,17 +65,6 @@ export default {
       sport_types: [],
       event_place: undefined
     },
-    sport_types: [
-      { label: 'Футбол', value: 1 },
-      { label: 'Волейбол', value: 2 },
-      { label: 'Хоккей', value: 3 },
-      { label: 'Дзюдо', value: 4 }
-    ],
-    places: [
-      { label: 'Стадион г. Казань', value: 1 },
-      { label: 'ДДЮТ', value: 2 },
-      { label: 'Бассейн №3', value: 3 }
-    ],
     pickerOptions: {
       shortcuts: [{
         text: 'Неделя',
@@ -141,27 +94,16 @@ export default {
     },
     value1: '',
     value2: '',
-    event: {
-      title: '',
-      photo: '',
-      description: '',
-      started_at: undefined,
-      event_place: undefined,
-      event_place_obj: {},
-      sport_types: [],
-      sport_types_obj: [],
-      is_active: false
-    },
-    events: []
+    event_places: []
   }),
   methods: {
     getData () {
       const vm = this
-      const eventFields = ['title', 'started_at', 'event_place_name', 'organizer_name', 'sport_types_names']
+      const eventFields = ['title']
 
       // if (!this.search.length) return this.events
 
-      return this.events.filter(item => {
+      return this.event_places.filter(item => {
         const isSearch = eventFields.reduce((res, field) => {
           const str = new RegExp(vm.search.toLowerCase().trim(), 'i')
           const strFromEng = new RegExp(autoKeyboardLang(vm.search.toLowerCase().trim()), 'i')
@@ -181,9 +123,9 @@ export default {
       // console.log(event)
     },
     getEvents () {
-      requests.get('event/')
+      requests.get('event_place/') // ?visible_to_contractors
         .then(response => {
-          this.events = response.data
+          this.event_places = response.data
         })
     },
     getListFromObject (obj, field) {

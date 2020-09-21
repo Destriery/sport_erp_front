@@ -2,24 +2,29 @@
   .login
     el-card(shadow="never")
       el-form(:model="loginForm" :rules="rules" status-icon ref="loginForm")
-        el-form-item(prop="username")
-          el-input(placeholder="Логин" v-model="loginForm.username" autocomplete="off")
+        el-form-item(prop="login")
+          el-input(placeholder="Логин" v-model="loginForm.login" autocomplete="off")
         el-form-item(prop="password")
           el-input(placeholder="Пароль" type="password" v-model="loginForm.password" show-password autocomplete="off")
         el-form-item
           el-button(type="success" @click="submitForm('loginForm')") Вход
+          center
+            p.el-form-item__error {{ serverError }}
 </template>
 
 <script>
+import { firstRequest } from '@/requests'
+
 export default {
   name: 'Login',
   data: () => ({
     loginForm: {
-      username: '',
+      login: '',
       password: ''
     },
+    serverError: '',
     rules: {
-      username: [
+      login: [
         { required: true, message: 'Поле не может быть пустым!', trigger: 'blur' }
       ],
       password: [
@@ -31,8 +36,21 @@ export default {
     submitForm (formName) {
       this.$refs[formName].validate((valid) => {
         if (valid) {
-          this.$router.push('/')
-          this.$store.commit('turnAuth')
+          firstRequest.post('user/authenticate/', this[formName])
+            .then(response => {
+              this.$store.commit('turnAuth', { token: response.data.token, user: response.data.data })
+
+              this.$ls.set('Token', response.data.token)
+              this.$ls.set('User', response.data.data)
+
+              this.$store.commit('getLists')
+
+              this.$router.push('/')
+            })
+            .catch(error => {
+              this.serverError = error.response.data.data
+              this.$refs[formName].resetFields()
+            })
         } else {
           return false
         }
@@ -55,6 +73,13 @@ export default {
   flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
+
+  .el-form-item__content {
+    .el-form-item__error {
+      position: relative;
+      top: 5px;
+    }
+  }
 
   .el-card {
     width: 400px;

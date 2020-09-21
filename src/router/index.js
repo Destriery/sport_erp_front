@@ -25,6 +25,21 @@ const routes = [
     component: () => import('../views/Event.vue')
   },
   {
+    path: '/tasks',
+    name: 'tasks',
+    component: () => import('../views/Tasks.vue')
+  },
+  {
+    path: '/tasks/:taskId',
+    name: 'task',
+    component: () => import('../views/Task.vue')
+  },
+  {
+    path: '/event_places',
+    name: 'event_places',
+    component: () => import('../views/EventPlaces.vue')
+  },
+  {
     path: '/about',
     name: 'about',
     // route level code-splitting

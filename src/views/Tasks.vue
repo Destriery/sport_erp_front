@@ -5,31 +5,22 @@
         el-breadcrumb-item(:to="{ path: '/' }")
           i.el-icon-s-home
         el-breadcrumb-item &nbsp;
-      h1 Мероприятия
-        el-button(type="success" icon="el-icon-plus" circle @click="isOpenEventDialog = true")
+      h1 Задачи
+        //-- el-button(type="success" icon="el-icon-plus" circle @click="isOpenEventDialog = true")
 
-      EventDialog(:sync="isOpenEventDialog" @sync="isOpenEventDialog = $event" @save="event = $event" :data="event")
+      //-- EventDialog(:sync="isOpenEventDialog" @sync="isOpenEventDialog = $event" @save="event = $event" :data="event")
 
       .filters
         el-input(placeholder="Искать.." v-model="search" clearable)
           i.el-input__icon.el-icon-search(slot="suffix")
 
         el-select(
-            v-model="filter.sport_types"
+            v-model="filter.contractor_type"
             filterable
             clearable
-            multiple
-            placeholder="Вид спорта"
+            placeholder="Тип задачи"
           )
-          el-option(v-for="item in sportTypes" :key="item.id" :label="item.title" :value="item.id")
-
-        el-select(
-            v-model="filter.event_place"
-            filterable
-            clearable
-            placeholder="Площадка"
-          )
-          el-option(v-for="item in eventPlaces" :key="item.id" :label="item.title" :value="item.id")
+          el-option(v-for="item in contractorsTypes" :key="item.value" :label="item.title" :value="item.value")
 
         el-date-picker(
             v-model="value2"
@@ -42,19 +33,19 @@
             :picker-options="pickerOptions"
           )
 
-      el-table(:data="getData()" @row-click="openEvent")
+        el-radio(v-model="filter.own" label="1") Отправлена заявка
+        el-radio(v-model="filter.own" label="0") Остальные
+
+      el-table(:data="getData()" @row-click="openTask")
         el-table-column(label="Название" prop="title")
-        el-table-column(label="Дата" prop="started_at")
+        el-table-column(label="Мероприятие" prop="event_title")
+        el-table-column(label="Дедлайн" prop="finished_at")
           template(slot-scope="scope")
             span(v-text="formatDateTime(scope.row.started_at)")
-        el-table-column(label="Площадка" prop="event_place.title")
-        el-table-column(label="Виды спорта" prop="sport_types")
+        el-table-column(label="Бюджет" prop="price")
+        el-table-column(label="Завершено" prop="completed" align="center")
           template(slot-scope="scope")
-            span(v-html="getListFromObject(scope.row.sport_types, 'title')")
-
-        el-table-column(label="Активность" prop="is_active" align="center")
-          template(slot-scope="scope")
-            i.el-icon-success.green(v-if="scope.row.is_active")
+            i.el-icon-success.green(v-if="scope.row.completed")
 
   //-- заголовок, дата, активно/прошло, возможно какая-то статистика - типа прогресса по организации, количество участников и тд площадка, дата/время
 </template>
@@ -69,22 +60,24 @@ import { defaultRequest } from '@/requests'
 const requests = defaultRequest(JSON.parse(localStorage.getItem('serp__Token')).value)
 
 export default {
-  name: 'Events',
+  name: 'Tasks',
   computed: mapState([
     'isAuth',
+    'user',
     'isCollapseNav',
     'sportTypes',
-    'eventPlaces'
+    'eventPlaces',
+    'contractorsTypes'
   ]),
   components: {
     EventDialog
   },
   mounted () {
-    this.getEvents()
+    this.getTasks()
   },
   watch: {
     event (val) {
-      this.getEvents()
+      this.getTasks()
     }
   },
   data: () => ({
@@ -99,19 +92,10 @@ export default {
     search: '',
     filter: {
       sport_types: [],
-      event_place: undefined
+      event_place: undefined,
+      contractor_type: undefined,
+      own: '1'
     },
-    sport_types: [
-      { label: 'Футбол', value: 1 },
-      { label: 'Волейбол', value: 2 },
-      { label: 'Хоккей', value: 3 },
-      { label: 'Дзюдо', value: 4 }
-    ],
-    places: [
-      { label: 'Стадион г. Казань', value: 1 },
-      { label: 'ДДЮТ', value: 2 },
-      { label: 'Бассейн №3', value: 3 }
-    ],
     pickerOptions: {
       shortcuts: [{
         text: 'Неделя',
@@ -141,27 +125,16 @@ export default {
     },
     value1: '',
     value2: '',
-    event: {
-      title: '',
-      photo: '',
-      description: '',
-      started_at: undefined,
-      event_place: undefined,
-      event_place_obj: {},
-      sport_types: [],
-      sport_types_obj: [],
-      is_active: false
-    },
-    events: []
+    tasks: []
   }),
   methods: {
     getData () {
       const vm = this
-      const eventFields = ['title', 'started_at', 'event_place_name', 'organizer_name', 'sport_types_names']
+      const eventFields = ['title']
 
       // if (!this.search.length) return this.events
 
-      return this.events.filter(item => {
+      return this.tasks.filter(item => {
         const isSearch = eventFields.reduce((res, field) => {
           const str = new RegExp(vm.search.toLowerCase().trim(), 'i')
           const strFromEng = new RegExp(autoKeyboardLang(vm.search.toLowerCase().trim()), 'i')
@@ -169,21 +142,22 @@ export default {
           return str.test(item[field]) || strFromEng.test(item[field]) || !!res
         }, false)
 
-        const isEventPlace = vm.filter.event_place ? vm.filter.event_place === item.event_place : true
+        const isContractorType = vm.filter.contractor_type ? vm.filter.contractor_type === item.contractor_type : true
 
-        const isSportTypes = vm.filter.sport_types.length ? vm.filter.sport_types.reduce((res, type) => item.sport_types.includes(type) || res, false) : true
+        const isOwnRow = item.applications_obj.reduce((res, i) => i.profile.id === vm.user.id || res, false)
+        const isOwn = vm.filter.own === '1' ? isOwnRow : !isOwnRow
 
-        return isSearch && isEventPlace && isSportTypes
+        return isSearch && isContractorType && isOwn
       })
     },
-    openEvent (event) {
-      this.$router.push({ name: 'event', params: { eventId: event.id } })
+    openTask (task) {
+      this.$router.push({ name: 'task', params: { taskId: task.id } })
       // console.log(event)
     },
-    getEvents () {
-      requests.get('event/')
+    getTasks () {
+      requests.get('task/?visible_to_contractors=1') // ?visible_to_contractors
         .then(response => {
-          this.events = response.data
+          this.tasks = response.data
         })
     },
     getListFromObject (obj, field) {
@@ -203,6 +177,10 @@ export default {
 
     .el-input, .el-select {
       width: 200px;
+      margin-right: 20px;
+    }
+    .el-date-editor {
+      width: 300px;
       margin-right: 20px;
     }
   }

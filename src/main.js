@@ -1,4 +1,5 @@
 import Vue from 'vue'
+import VueStorage from 'vue-ls'
 
 import ElementUI from 'element-ui'
 import lang from 'element-ui/lib/locale/lang/ru-RU'
@@ -13,6 +14,11 @@ Vue.config.productionTip = false
 
 locale.use(lang)
 Vue.use(ElementUI)
+
+const vueLsOptions = {
+  namespace: 'serp__'
+}
+Vue.use(VueStorage, vueLsOptions)
 
 new Vue({
   router,

@@ -8,16 +8,19 @@
         el-menu-item(@click="isUserMenu = false")
           i.el-icon-user
           span(slot="title") Личный кабинет
-        el-menu-item(@click="turnAuth")
+        el-menu-item(@click="logout")
           i.el-icon-sunset
           span(slot="title") Выход
       .el-menu__avatar(slot="reference" :class="{'el-menu__avatar--close': isCollapseNav}")
-        el-avatar.el-menu__avatar__icon(icon="el-icon-user-solid")
-        span.el-menu__avatar__name(ref="avatar_name") Иванов Петр Иванович
+        el-avatar.el-menu__avatar__icon(icon="el-icon-user-solid" :src="user.avatar")
+        span.el-menu__avatar__name(ref="avatar_name") {{ user.name }}
     el-menu-item(index="/events")
         i.el-icon-basketball
         span(slot="title") Мероприятия
-    el-menu-item(index="2")
+    el-menu-item(index="/tasks")
+        i.el-icon-guide
+        span(slot="title") Задачи
+    el-menu-item(index="/event_places")
       i.el-icon-map-location
       span(slot="title") Площадки
 
@@ -34,15 +37,22 @@ export default {
   }),
   computed: mapState([
     'isAuth',
-    'isCollapseNav'
+    'isCollapseNav',
+    'user'
   ]),
   methods: {
+    handleSelect (event) {
+      console.log(event)
+    },
     turnCollapse () {
       this.$store.commit('turnCollapseNav')
     },
-    turnAuth () {
+    logout () {
+      this.$ls.remove('Token')
+      this.$ls.remove('User')
+
       this.isUserMenu = false
-      this.$store.commit('turnAuth')
+      this.$store.commit('turnAuth', '', {})
       this.$router.push('login')
     }
   }
@@ -118,7 +128,7 @@ export default {
 .el-menu__turn {
   position: absolute;
   bottom: 30px;
-  right: -15px;
+  right: -14px;
   padding: 3px;
   background: #fff;
   border: 1px solid #409eff;

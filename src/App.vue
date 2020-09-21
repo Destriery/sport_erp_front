@@ -7,6 +7,8 @@
 
 <script>
 import { mapState } from 'vuex'
+
+// import { requests } from '@/requests'
 import Nav from '@/components/Nav.vue'
 
 export default {
@@ -19,8 +21,12 @@ export default {
     Nav
   },
   mounted () {
+    this.$store.commit('turnAuth', { token: this.$ls.get('Token'), user: this.$ls.get('User') })
+
     if (!this.isAuth) {
       this.$router.push('login')
+    } else {
+      this.$store.commit('getLists')
     }
   }
 }
@@ -46,6 +52,7 @@ export default {
 .page {
   padding-left: 270px;
   padding-right: 20px;
+  padding-bottom: 100px;
   transition: padding 0.3s ease;
 
   &.page--wide {

@@ -7,51 +7,18 @@
         el-breadcrumb-item(:to="{ path: '/events' }") Мероприятия
         el-breadcrumb-item
       h1 {{ event.title }}
-        el-button(type="success" icon="el-icon-edit-outline" circle @click="turnEventEditVisible")
+        el-button(type="success" icon="el-icon-edit-outline" circle @click="isOpenEventDialog = true")
+        el-button(type="warning" icon="el-icon-refresh" circle @click="getEvent()" round)
         el-button(type="primary" @click="turnTaskEditVisible" round) Создать задачу
-      el-dialog(:title="'Редактировать ' + event.title" :visible.sync="isEventEditVisible")
-        el-form(:model="event" label-position="top")
-          el-form-item(label="Название:")
-            el-input(v-model="event.title")
-          el-form-item(label="Даты проведения:")
-            el-date-picker(
-              v-model="event.date"
-              type="daterange"
-              align="right"
-              unlink-panels
-              range-separator=" - "
-              start-placeholder="Начало"
-              end-placeholder="Завершение"
-            )
-          el-form-item(label="Виды спорта:")
-            el-select(
-                v-model="event.sport_types"
-                filterable
-                clearable
-                multiple
-                placeholder="Вид спорта"
-              )
-              el-option(v-for="item in sport_types" :key="item.value" :label="item.label" :value="item.value")
-          el-form-item(label="Площадка:")
-            el-select(
-                v-model="event.event_place"
-                filterable
-                clearable
-                placeholder="Площадка"
-              )
-              el-option(v-for="item in places" :key="item.value" :label="item.label" :value="item.value")
+        el-button(v-if="!event.is_created_task_templates" @click="setDefaultTasks()" round) Создать типовые задачи
 
-          el-form-item(label="Описание:")
-            el-input(v-model="event.description" type="textarea" :autosize="{ minRows: 5, maxRows: 10}")
-        span.dialog-footer(slot="footer")
-          el-button(@click="turnEventEditVisible($event, 'cancel')") Отмена
-          el-button(@click="turnEventEditVisible($event, 'save')" type="success") Сохранить
+      EventDialog(:sync="isOpenEventDialog" @sync="isOpenEventDialog = $event" @save="event = $event" :data="event")
 
       el-dialog(title="Редактировать задачу" :visible.sync="isTaskEditVisible")
         el-form(:model="task" label-position="top")
           el-form-item(label="Название:")
             el-input(v-model="task.title")
-          el-form-item(label="Название:")
+          el-form-item(label="Бюджет")
             el-input(v-model="task.price")
           el-form-item(label="Описание:")
             el-input(v-model="task.description" type="textarea" :autosize="{ minRows: 5, maxRows: 10}")
@@ -75,14 +42,17 @@
 
             .el-tab__sidebar__block
               h3 Дата проведения:
-              p {{ event.started_at }}
+              p(v-text="formatDateTime(event.started_at)")
             .el-tab__sidebar__block
               h3 Место проведения:
-              p {{ event.event_place_name }}
+              p(v-text="event.event_place_obj.title")
             .el-tab__sidebar__block
               h3 Виды спорта:
               p
-                el-tag(v-for="title in event.sport_types_names.split(', ')") {{ title }}
+                el-tag(v-for="title in getListFromObject(event.sport_types_obj, 'title')") {{ title }}
+            .el-tab__sidebar__block
+              h3 Осталось билетов:
+              p {{ event.tickets_count }}
 
           .el-tab__main
             h2 Описание:
@@ -95,10 +65,9 @@
                 p {{ props.row.description }}
                 h3 Заявки:
                 .event__tasks__applications
-                  el-card(:class="{selected: app.selected}" v-for="app in props.row.applications")
+                  el-card(:class="{selected: app.selected}" v-for="app in props.row.applications_obj")
                     template(slot="header")
-                      el-avatar.el-menu__avatar__icon(icon="el-icon-user-solid")
-                        img(:src="app.profile.avatar" :alt="app.profile.name")
+                      el-avatar.el-menu__avatar__icon(icon="el-icon-user-solid" :src="app.profile.avatar")
                       span {{ app.profile.name }}
                       el-button(style="margin-left: auto;" size="small") К профилю
                       el-button(
@@ -108,17 +77,58 @@
                           @click="selectApp(app, props.row)"
                         )
                     div
+                      p
+                        b Бюджет:
+                        span {{ app.price }}
+                      br
                       p {{ app.description }}
 
-            el-table-column(label="Цель" prop="title")
-            el-table-column(label="Бюджет" prop="price")
+            el-table-column(label="Название" prop="title" width="500")
             el-table-column(label="Дедлайн" prop="finished_at")
+              template(slot-scope="scope")
+                span(v-text="formatDateTime(scope.row.started_at)")
+            el-table-column(label="Бюджет" prop="price")
+            el-table-column(label="Есть заявки" prop="applications" align="center")
+              template(slot-scope="scope")
+                i.el-icon-document(v-if="scope.row.applications.length")
+            el-table-column(label="Выбран исполнитель" prop="selected" align="center")
+              template(slot-scope="scope")
+                i.el-icon-success.green(v-if="scope.row.applications_obj && scope.row.applications_obj.reduce((res, i) => i.selected || res, false)")
+            el-table-column(label="Завершено" prop="completed" align="center")
+              template(slot-scope="scope")
+                i.el-icon-success.green(v-if="scope.row.completed")
+
+        el-tab-pane(:label="'Участники' + ((parts_count) ? ' (' + parts_count + ')' : '')")
+          el-table(:data="parts")
+            el-table-column(label="Имя" prop="name" width="500")
+            el-table-column(label="Дата регистрации на событие" prop="created_at")
+              template(slot-scope="scope")
+                span(v-text="formatDateTime(scope.row.created_at)")
+
+        el-tab-pane(:label="'Посетители' + ((visitors_count) ? ' (' + visitors_count + ')' : '')")
+          el-table(:data="visitors")
+            el-table-column(label="Имя" prop="name" width="500")
+            el-table-column(label="Дата покупки билета" prop="created_at")
+              template(slot-scope="scope")
+                span(v-text="formatDateTime(scope.row.created_at)")
+            el-table-column(label="Оплата" prop="is_paid" align="center")
+              template(slot-scope="scope")
+                i.el-icon-success.green(v-if="scope.row.is_paid")
+
+        el-tab-pane.event__tasks(label="Маркетинг")
+
   </el-tabs>
 </template>
 
 <script>
 import Vue from 'vue'
 import { mapState } from 'vuex'
+
+import { formatDateTime } from '@/other'
+import EventDialog from '@/components/EventDialog'
+
+import { defaultRequest } from '@/requests'
+const requests = (localStorage.getItem('serp__Token')) ? defaultRequest(JSON.parse(localStorage.getItem('serp__Token')).value) : ''
 
 export default {
   name: 'Event',
@@ -132,17 +142,22 @@ export default {
           }
         })
       }
-    })
+    }),
+    EventDialog
+  },
+  mounted () {
+    this.getEvent()
   },
   computed: mapState([
     'isAuth',
-    'isCollapseNav'
+    'isCollapseNav',
+    'sportTypes',
+    'eventPlaces'
   ]),
   data: () => ({
-    isEventEditVisible: false,
-    eventEditPrevios: {},
     isTaskEditVisible: false,
     taskEditPrevios: {},
+    isOpenEventDialog: false,
     loading: true,
     sport_types: [
       { label: 'Футбол', value: 1 },
@@ -155,120 +170,104 @@ export default {
       { label: 'ДДЮТ', value: 2 },
       { label: 'Бассейн №3', value: 3 }
     ],
+    sport_type: [],
+    event_place: 0,
     task: {
-      title: 'Задача 1',
-      description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет. Среди фруктов яблоко является очень распространенным продуктом и практически целый год присутствует в нашем рационе питания. Употребление этих плодов натощак недопустимо при гастритах с повышенной кислотностью, язвенных болезнях, желчекаменной болезни.',
-      price: 100000
+      title: '',
+      description: '',
+      price: 0
     },
-    tasks: [
-      {
-        title: 'Задача 1',
-        description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет. Среди фруктов яблоко является очень распространенным продуктом и практически целый год присутствует в нашем рационе питания. Употребление этих плодов натощак недопустимо при гастритах с повышенной кислотностью, язвенных болезнях, желчекаменной болезни.',
-        price: 100000,
-        finished_at: '12.01.2021',
-        created_at: '02.10.2020',
-        applications: [
-          {
-            profile: {
-              pk: 1,
-              avatar: 'http://yastart.ru/uploads/posts/2019-03/1553884944_10.jpg',
-              name: 'Петрович',
-              email: 'test@test.com'
-            },
-            price: 70000,
-            description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет.',
-            selected: false
-          },
-          {
-            profile: {
-              pk: 2,
-              avatar: '',
-              name: 'Иваныч',
-              email: 'test@test.com'
-            },
-            price: 70000,
-            description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет.',
-            selected: true
-          }
-        ]
-      },
-      {
-        title: 'Задача 2',
-        description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет. Среди фруктов яблоко является очень распространенным продуктом и практически целый год присутствует в нашем рационе питания. Употребление этих плодов натощак недопустимо при гастритах с повышенной кислотностью, язвенных болезнях, желчекаменной болезни.',
-        price: 100000,
-        finished_at: '12.01.2021',
-        created_at: '02.10.2020',
-        applications: [
-          {
-            profile: {
-              name: 'Петрович',
-              email: 'test@test.com'
-            },
-            price: 70000,
-            description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет.',
-            selected: false
-          },
-          {
-            profile: {
-              name: 'Петрович',
-              email: 'test@test.com'
-            },
-            price: 70000,
-            description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет.',
-            selected: true
-          },
-          {
-            profile: {
-              name: 'Петрович',
-              email: 'test@test.com'
-            },
-            price: 70000,
-            description: 'Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет.',
-            selected: false
-          }
-        ]
-      }
-    ],
+    tasks: [],
+    parts_count: 0,
+    parts: [],
+    visitors_count: 0,
+    visitors: [],
     event: {
-      pk: 1,
-      title: 'Событие 1',
-      photo: 'https://stroi.mos.ru/uploads/media/main_image/0001/73/13794d0e13d08698190ae9903eb1c7b26227376c.jpeg',
-      description: `
-        <p>Ценность яблок кроется в их составе. Почти 80% яблок составляет вода. Остальная часть приходится на клетчатку, органические кислоты, углеводы. Именно зеленое яблоко рекомендуют употреблять во время диет. Среди фруктов яблоко является очень распространенным продуктом и практически целый год присутствует в нашем рационе питания. Употребление этих плодов натощак недопустимо при гастритах с повышенной кислотностью, язвенных болезнях, желчекаменной болезни.</p>
-
-        <p>С целью снизить число людей с ожирением рестораны быстрого питания и сети супермаркетов вводят новые, более полезные опции (например, салаты, сэндвичи с цельнозерновым хлебом или напитки без сахара), а также предоставляют информацию о пищевой ценности продуктов в меню или на упаковке. Вторично разогретая пища, особенно если после её приготовления прошло уже несколько часов, практически не содержит ни витаминов, ни других полезных веществ. На поведение потребителей могут повлиять не только вкусовые предпочтения, но и немедленные желания получить определенную еду.</p>
-
-        <p>Являясь одной из самых распространённых в мире сельскохозяйственных культур, рис занимает главенствующую позицию в национальной кухне сотен народов. В России до XIX века рис называли «сарацинское зерно». Более половины населения Земли питаются в основном именно рисом, что делает эту сельскохозяйственную культуру важнейшей на планете. В некоторых странах Азии из этого растения готовят такие напитки, как вино и пиво. Из рисовых зерён делают так называемую съедобную рисовую бумагу, применяемую в кондитерском деле.</p>
-      `,
-      started_at: '12.01.2021',
-      date: '',
-      event_place: 1,
-      event_place_name: 'Стадион г. Казань',
-      organizer: 3,
-      organizer_name: 'Министерство спорта',
-      sport_types: [1, 2],
-      sport_types_names: 'Футбол, Волейбол',
-      is_active: true
+      title: '',
+      photo: '',
+      description: '',
+      started_at: undefined,
+      event_place: undefined,
+      event_place_obj: {},
+      sport_types: [],
+      sport_types_obj: [],
+      is_active: false
     }
   }),
   methods: {
-    turnEventEditVisible (e, type = 'open') {
-      switch (type) {
-        case 'open':
-          (Object.keys(this.eventEditPrevios).length) || (this.eventEditPrevios = JSON.parse(JSON.stringify(this.event)))
-          break
-        case 'cancel':
-          this.event = JSON.parse(JSON.stringify(this.eventEditPrevios))
-          this.eventEditPrevios = {}
-          break
-        case 'save':
-          this.eventEditPrevios = {}
-          break
-      }
+    formatAppData (inputData) {
+      const data = JSON.parse(JSON.stringify(inputData))
+      delete data.profile
 
-      this.isEventEditVisible = !this.isEventEditVisible
+      return data
+    },
+    selectApp (app, task) {
+      const curSelected = app.selected
+      task.applications_obj.forEach(item => {
+        if (item.id !== app.id) {
+          item.selected = false
+          requests.patch(`application/${item.id}/`, this.formatAppData(item))
+        }
+      })
+      app.selected = !curSelected
+      requests.patch(`application/${app.id}/`, this.formatAppData(app))
+      this.getTasks()
+    },
+    getEvent () {
+      const vm = this
+      const eventId = this.$route.params.eventId
+
+      requests.get(`event/${eventId}`)
+        .then(response => {
+          vm.event = response.data
+          vm.getTasks()
+          vm.getParts()
+          vm.getVisitors()
+        })
+    },
+    getTasks () {
+      requests.get('task/?event=' + this.event.id)
+        .then(response => {
+          this.tasks = response.data
+        })
+    },
+    getParts () {
+      requests.get(`event/${this.event.id}/participant/`)
+        .then(response => {
+          this.parts_count = response.data.count
+          this.parts = response.data.data
+        })
+    },
+    getVisitors () {
+      requests.get(`event/${this.event.id}/visitor/`)
+        .then(response => {
+          this.visitors_count = response.data.count
+          this.visitors = response.data.data
+        })
+    },
+    setDefaultTasks () {
+      requests.get(`event/${this.event.id}/create_tasks_template/`)
+        .then(response => {
+          this.getTasks()
+        })
+    },
+    formatDateTime (datetime) {
+      return formatDateTime(datetime, 'datetime', true)
+    },
+    getListFromObject (obj, field) {
+      return obj.map((item, i) => { return item[field] })
+    },
+    formatTaskData (inputData) {
+      const data = JSON.parse(JSON.stringify(inputData))
+      data.event = this.event.id
+
+      return data
     },
     turnTaskEditVisible (e, type = 'open') {
+      const vm = this
+      const saveMethod = (this.task.id) ? 'patch' : 'post'
+      const taskId = (saveMethod === 'patch') ? this.task.id + '/' : ''
+
       switch (type) {
         case 'open':
           (Object.keys(this.taskEditPrevios).length) || (this.taskEditPrevios = JSON.parse(JSON.stringify(this.task)))
@@ -278,18 +277,15 @@ export default {
           this.taskEditPrevios = {}
           break
         case 'save':
+          requests[saveMethod](`task/${taskId}`, this.formatTaskData(this.task))
+            .then(response => {
+              vm.getTasks()
+            })
           this.taskEditPrevios = {}
           break
       }
 
       this.isTaskEditVisible = !this.isTaskEditVisible
-    },
-    selectApp (app, task) {
-      const curSelected = app.selected
-      task.applications.forEach(item => {
-        item.selected = false
-      })
-      app.selected = !curSelected
     }
   }
 }
